@@ -10,6 +10,7 @@ from math import*
 import matplotlib.pyplot as pl
 from astropy.io import fits
 import mpdaf.obj as mpdo
+import scipy.ndimage as ndimage
 from astropy.wcs import WCS
 
 import time
@@ -214,25 +215,25 @@ class Multiwavelength_Image:
 		l = 12
 
 		if source == 'MRC0943':
-			ax.scatter(25, 25, marker='X', facecolor='red', s=60, zorder=5, edgecolor='k')
-			ax.text(24.5, 23, 'Host', c='red', fontsize=8, weight='bold', 
+			ax.scatter(25, 25, marker='X', facecolor='red', s=100, zorder=5, edgecolor='k')
+			ax.text(24.25, 22.5, 'Host', c='red', fontsize=12, weight='bold', 
 				backgroundcolor='white',
-				bbox={'facecolor':'white', 'alpha':0.7, 'pad':4}, zorder=5)
+				bbox={'facecolor':'white', 'alpha':0.8, 'pad':4}, zorder=5)
  
-			ax.scatter(21.63, 34.97, marker='X', facecolor='red', s=60, zorder=5, edgecolor='k')
-			ax.text(21, 32.97, 'NE', c='red', fontsize=8, weight='bold', 
+			ax.scatter(21.63, 34.97, marker='X', facecolor='red', s=100, zorder=5, edgecolor='k')
+			ax.text(20.5, 32.47, 'NE', c='red', fontsize=12, weight='bold', 
 				backgroundcolor='white',
-				bbox={'facecolor':'white', 'alpha':0.7, 'pad':4}, zorder=5)
+				bbox={'facecolor':'white', 'alpha':0.8, 'pad':4}, zorder=5)
 
-			ax.scatter(33, 20, marker='X', facecolor='red', s=60, zorder=5, edgecolor='k')
-			ax.text(32.5, 18, 'Thor', c='red', fontsize=8, weight='bold', 
+			ax.scatter(33, 20, marker='X', facecolor='red', s=100, zorder=5, edgecolor='k')
+			ax.text(32., 17.5, 'Thor', c='red', fontsize=12, weight='bold', 
 				backgroundcolor='white',
-				bbox={'facecolor':'white', 'alpha':0.7, 'pad':4}, zorder=5)
+				bbox={'facecolor':'white', 'alpha':0.8, 'pad':4}, zorder=5)
 
-			ax.scatter(37.46, 16.30, marker='X', facecolor='red', s=60, zorder=5, edgecolor='k')
-			ax.text(37, 14.30, 'Loke', c='red', fontsize=8, weight='bold', 
+			ax.scatter(37.46, 16.30, marker='X', facecolor='red', s=100, zorder=5, edgecolor='k')
+			ax.text(35.5, 13.80, 'Loke', c='red', fontsize=12, weight='bold', 
 				backgroundcolor='white',
-				bbox={'facecolor':'white', 'alpha':0.7, 'pad':4}, zorder=5)
+				bbox={'facecolor':'white', 'alpha':0.8, 'pad':4}, zorder=5)
 
 		# ax.text(l, l+dl, '10 kpc', color='red', fontsize=5, 
 		# 	bbox={'facecolor':'white', 'alpha':0.7, 'pad':10}, zorder=5)
@@ -402,30 +403,32 @@ class Multiwavelength_Image:
 		pix = list(chain(*muse_img_arr))
 		pix_rms = np.sqrt(np.mean(np.square(pix)))
 		pix_med = np.median(pix)
+
 		vmax = 5*(pix_med + pix_rms) 
 		vmin = 0.2*(pix_med - pix_rms) 
 
-		muse_fig = ax1.imshow(muse_img_arr, transform=ax1.get_transform(muse_wcs), origin='lower', 
+		muse_smoothed = ndimage.gaussian_filter(muse_img_arr, sigma=(1, 1), order=0)
+		muse_fig = ax1.imshow(muse_smoothed, transform=ax1.get_transform(muse_wcs), origin='lower', 
 			interpolation='nearest', 
 			cmap='gist_gray_r', vmin=vmin, vmax=vmax)
 
 		lya_fn = self.muse_lya_contours( muse_lya_rms, self.output_dir+Lya_img+'_'+str(int(lam1))+'_'+str(int(lam2))+'.fits' )
 		lya_data, lya_wcs, contours = lya_fn[0], lya_fn[1], lya_fn[2]
 
-		ax1.contour( lya_data, levels=contours, colors='grey',
+		ax1.contour( lya_data, levels=contours, colors='grey', alpha=0.4,
 		transform=ax1.get_transform(muse_wcs) ) 
 
 		for (h1,h2) in radio_hotspots:
 			ax1.scatter(h1, h2, marker='X', transform=ax1.get_transform(muse_wcs), facecolor='green', 
 				s=100, zorder=10, edgecolor='black')
 
-		cbaxes = fig.add_axes([0.86, 0.12, 0.02, 0.8])
+		cbaxes = fig.add_axes([0.865, 0.12, 0.02, 0.8])
 		cb = pl.colorbar(muse_fig, orientation = 'vertical', cax=cbaxes)
-		cb.set_label(r'S.B. (10$^{-18}$ erg s$^{-1}$ cm$^{-2}$ arcsec$^{-2}$)',rotation=90, fontsize=10)
+		# cb.set_label(r' x 10$^{-18}$ erg s$^{-1}$ cm$^{-2}$ arcsec$^{-2}$',rotation=90, fontsize=8)
 
 		[irac_data, irac_wcs, contours] = self.irac_contours( irac_path, irac_img, irac_rms, 6 )
 
-		ax1.contour( irac_data, levels=contours, colors='red',
+		ax1.contour( irac_data, levels=contours, colors='red', alpha=0.5,
 		transform=ax1.get_transform(irac_wcs) )
 
 		# l1,l2 are (x,y) of [CI]1-0 image
@@ -445,46 +448,48 @@ class Multiwavelength_Image:
 		# ax1.plot( [m, m+dl], [n, n], c='red', lw='2', zorder=10.)
 
 			# add region labels for MRC 0943-242
+
+		fs = 10
 		if source == 'MRC0943':
-			ax1.scatter(25, 25, marker='X', facecolor='red', s=60, zorder=5, edgecolor='k')
-			ax1.text(24.5, 23, 'Host', c='red', fontsize=8, weight='bold', 
+			ax1.scatter(25, 25, marker='X', facecolor='red', s=100, zorder=5, edgecolor='k')
+			ax1.text(23.75, 22.5, 'Host', c='red', fontsize=fs, weight='bold', 
 				backgroundcolor='white',
-				bbox={'facecolor':'white', 'alpha':0.7, 'pad':4}, zorder=5)
+				bbox={'facecolor':'white', 'alpha':0.8, 'pad':4}, zorder=5)
  
-			ax1.scatter(21.63, 34.97, marker='X', facecolor='red', s=60, zorder=5, edgecolor='k')
-			ax1.text(21, 32.97, 'NE', c='red', fontsize=8, weight='bold', 
+			ax1.scatter(21.63, 34.97, marker='X', facecolor='red', s=100, zorder=5, edgecolor='k')
+			ax1.text(20.25, 32.47, 'A. NE', c='red', fontsize=fs, weight='bold', 
 				backgroundcolor='white',
-				bbox={'facecolor':'white', 'alpha':0.7, 'pad':4}, zorder=5)
+				bbox={'facecolor':'white', 'alpha':0.8, 'pad':4}, zorder=5)
 
-			ax1.scatter(33, 20, marker='X', facecolor='red', s=60, zorder=5, edgecolor='k')
-			ax1.text(32.5, 18, 'Thor', c='red', fontsize=8, weight='bold', 
+			ax1.scatter(33, 20, marker='X', facecolor='red', s=100, zorder=5, edgecolor='k')
+			ax1.text(31., 17.5, 'B. Thor', c='red', fontsize=fs, weight='bold', 
 				backgroundcolor='white',
-				bbox={'facecolor':'white', 'alpha':0.7, 'pad':4}, zorder=5)
+				bbox={'facecolor':'white', 'alpha':0.8, 'pad':4}, zorder=5)
 
-			ax1.scatter(37.46, 16.30, marker='X', facecolor='red', s=60, zorder=5, edgecolor='k')
-			ax1.text(37, 14.30, 'Loke', c='red', fontsize=8, weight='bold', 
+			ax1.scatter(37.46, 16.30, marker='X', facecolor='red', s=100, zorder=5, edgecolor='k')
+			ax1.text(34.5, 13.80, 'C. Loke', c='red', fontsize=fs, weight='bold', 
 				backgroundcolor='white',
-				bbox={'facecolor':'white', 'alpha':0.7, 'pad':4}, zorder=5)
+				bbox={'facecolor':'white', 'alpha':0.8, 'pad':4}, zorder=5)
 
 
 		ax1.set_xlabel(r'$\alpha$ (J2000)', fontsize=12)
 		ax1.set_ylabel(r'$\delta$ (J2000)', fontsize=12)
 
+
 		ra = ax1.coords[0]
 		ra.set_major_formatter('hh:mm:ss.s')
+		print(self.plot_dir, irac_img)
 
 		return pl.savefig(self.plot_dir+irac_img[:-5]+'_CI.png', dpi=300)
 	
-	def muse_lya_continuum_subtract( self, muse_path, muse_cube, lam1, lam2, mask_lmin, 
+	def muse_lya_continuum_subtract( self, muse_cube, lam1, lam2, mask_lmin, 
 		mask_lmax, ra_lim, dec_lim, source ): 
 		"""
 		Continuum-subtract MUSE Lya subcube
 
 		Parameters 
 		----------
-		muse path : Path of MUSE cube
-
-		muse_cube : Filename for MUSE datacube 
+		muse_cube : File path for MUSE datacube 
 
 		lam1 : Lower wavelength limit of subcube
 
@@ -508,10 +513,9 @@ class Multiwavelength_Image:
 		# Open MUSE Lya image
 		start_time = time.time()
 
-		muse_file = muse_path+muse_cube
-		muse_hdu = fits.open(muse_file)
+		muse_hdu = fits.open(muse_cube)
 
-		muse_mpdaf_cube = mpdo.Cube(muse_file, mmap=True)
+		muse_mpdaf_cube = mpdo.Cube(muse_cube, mmap=True)
 		# select F.O.V.
 		rg = muse_mpdaf_cube[:, dec_lim[0]:dec_lim[1], ra_lim[0]:ra_lim[1]]	
 

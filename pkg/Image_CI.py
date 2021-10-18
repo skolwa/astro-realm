@@ -110,7 +110,7 @@ class Image_CI:
 		[CI_data, CI_wcs, ci_contours] = self.CI_contours(self.CI_path, CI_moment0, CI_rms)
 
 		ax.contour(img_arr, levels=ci_contours*1.e3, colors='k',
-		 label='[CI](1-0)', zorder=-5, alpha=0.6, lw=0.2)
+		 label='[CI](1-0)', zorder=-5, alpha=0.25, lw=0.2)
 
 		# Optimise image colour-scale of host galaxy
 		pix = list(chain(*img_arr))
@@ -118,7 +118,7 @@ class Image_CI:
 		pix_med = np.median(pix)
 		vmax = 1.5*(pix_med + pix_rms) 
 		vmin = 0.1*(pix_med - pix_rms) 
-		CI_map = ax.imshow(img_arr, origin='lower', cmap='gray', 
+		CI_map = ax.imshow(img_arr, origin='lower', cmap='viridis', 
 			vmin=vmin, vmax=vmax, zorder=-10)
 
 		ax.set_xlabel(r'$\alpha$ (J2000)', size=12)
@@ -129,14 +129,14 @@ class Image_CI:
 
 		cbaxes = fig.add_axes([0.86, 0.12, 0.02, 0.8])
 		cb = pl.colorbar(CI_map, cax=cbaxes)
-		cb.set_label('mJy/beam',rotation=90, fontsize=10)
+		cb.set_label(r'mJy / beam / GHz',rotation=90, fontsize=10)
 		cb.ax.tick_params(labelsize=10)
 
 		#draw MW image boundaries 
 		if (source=='4C03' or source=='MRC0943'):
-			hst = Rectangle((10,10), 30, 30, fill=0, color='white', lw=2, alpha=0.6)
-			ax.add_artist(hst)
-			ax.text(10, 8, 'HST FOV', c='white', fontsize=12, weight='bold')
+			# hst = Rectangle((10,10), 30, 30, fill=0, color='white', lw=2, alpha=0.6)
+			# ax.add_artist(hst)
+			# ax.text(10, 8, 'HST FOV', c='white', fontsize=12, weight='bold')
 
 			if source=='4C03':
 				muse = Rectangle((15,15), 17, 17, fill=0, color='white', lw=2, alpha=0.6)
@@ -305,7 +305,7 @@ class Image_CI:
 		freq_host 	  = freq_em/(1.+z)
 		freq_host_err = (z_err/z)*freq_host
 	
-		SdV = 3.*mean_rms*np.sqrt(10 * 50)				# 3*sigma flux estimate in mJy km/s (assuming FWHM=50 km/s)
+		SdV = 5.*mean_rms*np.sqrt(10 * 100)				# 5*sigma flux estimate on 10 km/s binned spectra in mJy km/s (assuming FWHM=100 km/s)
 	
 		print('SdV = %f mJy km/s' %SdV)	
 		print('Frequency of host galaxy (from systemic z) = %.2f +/- %.2f GHz' 

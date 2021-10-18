@@ -93,7 +93,7 @@ class Spectrum_CI:
 		return (fwhm_kms, fwhm_kms_err)
 	
 	def make_spectrum( self, CI_path, CI_moment0, 
-		CI_region, source, p, z, z_err, freq_obs_mt0, npb_rms):
+		CI_region, source, p, z, z_err, freq_obs_mt0):
 		"""
 		Show [CI] line spectra and line-fits
 	
@@ -126,7 +126,6 @@ class Spectrum_CI:
 		self.z = z
 		self.z_err = z_err
 		self.freq_obs_mt0 = freq_obs_mt0
-		self.npb_rms = npb_rms
 
 		freq_em = 492.161		#rest frequency of [CI](1-0) in GHz
 
@@ -136,7 +135,6 @@ class Spectrum_CI:
 		bmaj, bmin, bpa = hdr['bmaj'], hdr['bmin'], hdr['bpa']  # bmaj, bmin in degrees
 
 		print('{:.2f} x {:.2f} arcsec^2'.format(bmaj*3600, bmin*3600))
-
 
 		k = -1 
 		for spec in CI_region:
@@ -169,7 +167,8 @@ class Spectrum_CI:
 					('g_cen', p[k][1], True, 0.),
 					('a', p[k][2], True, 0.),	
 					('wid', p[k][3], True, 0.),  	
-					('cont', p[k][4], True ))
+					('cont', p[k][4], True, 0., 0.001 )
+					)
 				
 				mod 	= lm.Model(Gaussian.gauss) 
 				fit 	= mod.fit(flux, pars, x=freq, weights=inv_noise)
@@ -181,24 +180,30 @@ class Spectrum_CI:
 				res = fit.params
 
 				# Line-width in km/s
-				Nsig_freq_o_err = abs(conf_int['g_cen'][0][1] - conf_int['g_cen'][2][1])/2.
-				freq_o, freq_o_err 	= res['g_cen'].value, Nsig_freq_o_err
+				freq_o, freq_o_err = res['g_cen'].value, res['g_cen'].stderr
+				# freq_o_err_lo, freq_o_err_hi = freq_o - conf_int['g_cen'][0][1], conf_int['g_cen'][2][1] - freq_o
 
-				Nsig_sigma_err = abs(conf_int['wid'][0][1] - conf_int['wid'][2][1])/2.
-				sigma, sigma_err 	= res['wid'].value, Nsig_sigma_err
+				sigma = res['wid'].value
+				sigma_err = res['wid'].stderr
+				# sigma_err_lo, sigma_err_hi	= sigma - conf_int['wid'][0][1], conf_int['wid'][2][1] - sigma
 				
 				sigma_kms = (sigma/freq_em)*self.c
 				sigma_kms_err = sigma_kms*np.sqrt ( (sigma_err/sigma)**2 + (freq_o_err/freq_o)**2 )
+
+				# sigma_kms_err_lo = sigma_kms*np.sqrt ( (sigma_err_lo/sigma)**2 + (freq_o_err_lo/freq_o)**2 )
+				# sigma_kms_err_hi = sigma_kms*np.sqrt ( (sigma_err_hi/sigma)**2 + (freq_o_err_hi/freq_o)**2 )
 	
 				# FWHM in km/s
 				fwhm_kms, fwhm_kms_err = self.convert_fwhm_kms( sigma, sigma_err, freq_o, freq_o_err )
+
+				# fwhm_kms, fwhm_kms_err_lo = self.convert_fwhm_kms( sigma, sigma_err_lo, freq_o, freq_o_err_lo )
+				# fwhm_kms, fwhm_kms_err_hi = self.convert_fwhm_kms( sigma, sigma_err_hi, freq_o, freq_o_err_hi )
 				
-				print( "Line centre (GHz) = %.3f +/- %.3f"%(res['g_cen'], Nsig_freq_o_err))
-				print( "Sigma (km/s) = %.3f +/- %.3f" %(sigma_kms, sigma_kms_err))
-				print( "FWHM (km/s) = %.0f +/- %.0f" %(fwhm_kms, fwhm_kms_err))
+				print( "Line centre (GHz) = %.3f +/- {+%.3f}"%(freq_o, freq_o_err))
+				print( "Sigma (km/s) = %.3f +/- {+%.3f}" %(sigma_kms, sigma_kms_err))
+				print( "FWHM (km/s) = %.0f +/- {+%.0f}" %(fwhm_kms, fwhm_kms_err))
 	
-				Nsig_flux_peak_err = abs(conf_int['a'][0][1] - conf_int['a'][2][1])/2.
-				flux_peak, flux_peak_err = res['a'].value, Nsig_flux_peak_err
+				flux_peak, flux_peak_err = res['a'].value, res['a'].stderr
 	
 				# Integrated Flux in mJy km/s
 				SdV 		= flux_peak * fwhm_kms 				
@@ -215,7 +220,7 @@ class Spectrum_CI:
 				v_obs = self.c*(1. - freq_o/freq_em)
 	
 				vel_offset = v_obs - v_sys
-				vel_offset_err = vel_offset * ( (freq_o_err/freq_o)*((self.npb_rms/np.mean(rms))**2 - 1.) )
+				vel_offset_err = vel_offset * (freq_o_err/freq_o)
 				
 				print( "Velocity shift (km/s) = %.3f +/- %.3f" %( vel_offset, vel_offset_err ) )
 	
@@ -241,9 +246,9 @@ class Spectrum_CI:
 				print("[CI] line not detected")
 			
 			ax.plot( freq, flux, c='k', drawstyle='steps-mid' )
-			ax.plot( freq, rms, c='grey', alpha=0.5, drawstyle='steps-mid')
+			ax.plot( freq, rms, c='grey', alpha=1.0, drawstyle='steps-mid')
 
-			if (source=='MRC0943' and (spec=='Host' or spec=='NE')) or source=='4C19':
+			if (source=='MRC0943' and (spec=='Host' or spec=='NE')):
 				alma_spec_50 = np.genfromtxt(self.input_dir+source+'_spec_Host_50kms_freq.txt')
 
 				freq_50 = alma_spec_50[:,0]	
@@ -263,6 +268,14 @@ class Spectrum_CI:
 				freq_pb = pbcor_spec[:,0]
 				flux_pb = [ pbcor_spec[:,1][i]*1.e3 for i in range(len(freq_pb)) ]
 				ax.plot( freq_pb, flux_pb, c='#d2e5f7', drawstyle='steps-mid' )
+
+			else: 
+				alma_spec_50 = np.genfromtxt(self.input_dir+source+'_spec_Host_50kms_freq.txt')
+
+				freq_50 = alma_spec_50[:,0]	
+				flux_50 = [ alma_spec_50[:,1][i]*1.e3 for i in range(len(freq_50)) ]
+				ax.plot( freq_50, flux_50, c='#0a78d1', drawstyle='steps-mid' )
+
 
 			pl.savefig(self.output_dir+'CI_spec_'+spec+'.png')
 		
@@ -293,24 +306,13 @@ class Spectrum_CI:
 		vel0 = self.freq_to_vel(freq_sys, freq_em, 0.)
 
 		# Velocity axes 
-		if source=='4C03':
+		if source=='4C03' :
 			v_radio1 = [ self.freq_to_vel(data1[0][0][i], freq_em, 0.) for i in range(len(data1[0][0])) ] #model
 			v_radio2 = [ self.freq_to_vel(data2[0][0][i], freq_em, 0.) for i in range(len(data2[0][0])) ] #data 
 
 
 			voff1 = [ v_radio1[i] - vel0 for i in range(len(v_radio1)) ]
 			voff2 = [ v_radio2[i] - vel0 for i in range(len(v_radio2)) ]
-				
-		
-		elif source=='4C19':
-			v_radio1 = [ self.freq_to_vel(data1[0][0][i], freq_em, 0.) for i in range(len(data1[0][0])) ] #model
-			v_radio2 = [ self.freq_to_vel(data2[0][0][i], freq_em, 0.) for i in range(len(data2[0][0])) ] #data 
-			v_radio3 = [ self.freq_to_vel(data3[0][0][i], freq_em, 0.) for i in range(len(data3[0][0])) ] #data 
-
-
-			voff1 = [ v_radio1[i] - vel0 for i in range(len(v_radio1)) ]
-			voff2 = [ v_radio2[i] - vel0 for i in range(len(v_radio2)) ]	
-			voff_wide = [ v_radio3[i] - vel0 for i in range(len(v_radio3)) ]	
 
 		elif source=='MRC0943':
 			# plot 1
@@ -351,6 +353,19 @@ class Spectrum_CI:
 			voff42 = [ v_radio42[i] - vel0 for i in range(len(v_radio42)) ]	
 			voff43 = [ v_radio43[i] - vel0 for i in range(len(v_radio43)) ]
 
+		else:
+			v_radio1 = [ self.freq_to_vel(data1[0][0][i], freq_em, 0.) for i in range(len(data1[0][0])) ] #model
+			v_radio2 = [ self.freq_to_vel(data2[0][0][i], freq_em, 0.) for i in range(len(data2[0][0])) ] #data 
+			v_radio3 = [ self.freq_to_vel(data3[0][0][i], freq_em, 0.) for i in range(len(data3[0][0])) ] #data 
+
+
+			voff1 = [ v_radio1[i] - vel0 for i in range(len(v_radio1)) ]
+			voff2 = [ v_radio2[i] - vel0 for i in range(len(v_radio2)) ]	
+			voff_wide = [ v_radio3[i] - vel0 for i in range(len(v_radio3)) ]	
+
+		# round up to nearest 0.5
+		def roundup(x):
+			return int(ceil(x/10.0))*0.5
 
 		# Global plot parameters
 		fs = 12
@@ -359,25 +374,27 @@ class Spectrum_CI:
 
 		rcParams['font.sans-serif'] = ['Helvetica']
 
+
 		# Custom plot parameters per source
 		if source == '4C03':
 			fig, ax = pl.subplots(2, 1, figsize=(4, 3), sharex=True, 
 			constrained_layout=True, gridspec_kw={'height_ratios': [3,1]})
+
 			pl.subplots_adjust(hspace=0, wspace=0.01) 
 			host_cont = np.genfromtxt(self.output_dir+'Host_fit_params.txt')[6]
-			ax[0].plot(voff2, data4[0][1], c='#d2e5f7', drawstyle='steps-mid', alpha=0.8, lw=1) 
-			ax[0].plot(voff2, data2[0][1], c='k', drawstyle='steps-mid', alpha=0.9, lw=0.7)
-			ax[0].plot(voff1, data1[0][1], c='red', alpha=0.7, lw=1)
+			# ax[0].plot(voff2, data4[0][1], c='#d2e5f7', drawstyle='steps-mid', alpha=0.8, lw=0.8) 
+			ax[0].plot(voff2, data2[0][1], c='k', drawstyle='steps-mid', alpha=0.9, lw=0.8)
+			ax[0].plot(voff1, data1[0][1], c='red', alpha=0.7, lw=0.8)
 			indices = [ i for i in range(len(voff2)) if (voff2[i] > 220. and voff2[i] < 320.)  ]
 			voff2_sub = [ voff2[i] for i in indices ]
 			data1_2_sub = [ data2[0][1][i] for i in indices ]
 			ax[0].fill_between( voff2_sub, data1_2_sub, host_cont, where=data1_2_sub > host_cont , 
 				interpolate=1, color='yellow', alpha=0.5 )
-			ax[0].text(x_pos, y_pos, 'A. Host Galaxy', ha='left', transform=ax[0].transAxes, fontsize=fs, color='k')		
+			ax[0].text(x_pos, y_pos, '4C+03.24 Host Galaxy', ha='left', transform=ax[0].transAxes, fontsize=fs, color='k')		
 
-			miny,maxy,dy = -1.0, 2.1, 0.5
+			miny,maxy,dy = -1.0, 1.6, 0.5
 			ax[0].set_ylabel(r'S$_\nu$ (mJy)', fontsize=fs)
-			ax[0].plot([0.,0.], [miny, maxy], c='gray', ls='--', alpha=0.5)
+			ax[0].plot([0.,0.], [miny, maxy], c='grey', ls='--', alpha=0.5)
 			ax[0].set_yticks( np.arange(miny, maxy, dy) )
 			ax[0].yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
 			ax[0].set_ylim([miny+0.1, maxy])
@@ -385,27 +402,32 @@ class Spectrum_CI:
 			
 			miny,maxy,dy = 0.0, 0.7, 0.3
 			ax[1].set_yticks( np.arange(miny, maxy, dy) )
-			ax[1].plot([0.,0.], [miny, maxy], c='gray', ls='--', alpha=0.4)
+			ax[1].plot([0.,0.], [miny, maxy], c='grey', ls='--', alpha=0.5)
 			ax[1].set_xlabel(r'$\Delta v$ (km s$^{-1}$)', fontsize=fs)
 			ax[1].set_ylabel(r'$\sigma_{\nu}$', fontsize=fs )
-			ax[1].plot(voff2, data3[0][1], c='grey', alpha=0.5, drawstyle='steps-mid', lw=0.5)
+			ax[1].plot(voff2, data3[0][1], c='grey', alpha=0.5, drawstyle='steps-mid', lw=0.8)
 
 			for ax in ax: 
 				ax.tick_params(direction='in', length=4, right=1, top=1)
 
+				for pos in ['top','left','bottom', 'right']:
+					ax.spines[pos].set_linewidth(1.2)
+					ax.spines[pos].set_color('k')
+
 			pl.savefig(self.plot_dir+'4C03_CI_spectrums.png', bbox_inches = 'tight',
     		pad_inches = 0.1)
 
-		elif source == '4C19':
+		elif source == 'MRC0943':
 			fig, ax = pl.subplots(2, 1, figsize=(4, 3), sharex=True, 
 			constrained_layout=True, gridspec_kw={'height_ratios': [3,1]})
-			pl.subplots_adjust(hspace=0, wspace=0.01) 
-			ax[0].plot(voff1, data1[0][1], c='k', drawstyle='steps-mid', alpha=0.7, lw=0.7)
-			ax[0].plot(voff_wide, data3[0][1], c='#0a78d1', drawstyle='steps-mid', lw=1.5, alpha=0.9)
-			ax[0].text(x_pos, y_pos, 'A. Host Galaxy', ha='left', transform=ax[0].transAxes, fontsize=fs, color='k')		
 
-			miny,maxy,dy = -1.0, 2.1, 0.5
-			ax[0].plot([0.,0.], [miny, maxy], c='gray', ls='--', alpha=0.4)
+			pl.subplots_adjust(hspace=0, wspace=0.01) 
+			ax[0].plot(voff11, data1[0][1], c='k', drawstyle='steps-mid', alpha=1.0, lw=0.8)
+			ax[0].plot(voff13, data3[0][1], c='#0a78d1', drawstyle='steps-mid', alpha=0.8, lw=0.8)
+			ax[0].text(x_pos, y_pos, 'MRC 0943-242 Host Galaxy', ha='left', transform=ax[0].transAxes, fontsize=fs, color='k')		
+
+			miny,maxy,dy = -1.0, max(data1[0][1])+0.5, 0.5
+			ax[0].plot([0.,0.], [miny, maxy], c='grey', ls='--', alpha=0.5)
 			ax[0].set_yticks( np.arange(miny, maxy, dy) )
 			ax[0].yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
 			ax[0].set_ylim([miny+0.1, maxy])
@@ -413,113 +435,155 @@ class Spectrum_CI:
 			ax[0].set_ylabel(r'S$_\nu$ (mJy)', fontsize=fs)
 			ax[0].set_xlim([-400,400])
 
-			miny,maxy,dy = 0.0, 0.7, 0.3
+			miny,maxy,dy = 0.0, 1.25, 0.5
 			ax[1].set_yticks( np.arange(miny, maxy, dy) )
-			ax[1].plot([0.,0.], [miny, maxy], c='gray', ls='--', alpha=0.4)
+			ax[1].plot([0.,0.], [miny, maxy], c='grey', ls='--', alpha=0.5)
 			ax[1].set_ylabel(r'$\sigma_{\nu}$', fontsize=fs )
 			ax[1].set_xlabel(r'$\Delta v$ (km s$^{-1}$)', fontsize=fs)
-			ax[1].plot(voff2, data2[0][1], c='grey', alpha=0.5, drawstyle='steps-mid', lw=0.7)
+			ax[1].plot(voff12, data2[0][1], c='grey', alpha=0.5, drawstyle='steps-mid', lw=0.8)
 
 			for ax in ax: 
-				ax.tick_params(direction='in', length=4, right=1, top=1)
-		
-			pl.savefig(self.plot_dir+'4C19_CI_spectrums.png', bbox_inches = 'tight',
-				pad_inches = 0.1)
+				ax.tick_params(direction='in', length=4, right=1, top=1, width=1.)
+				for pos in ['top','left','bottom', 'right']:
+					ax.spines[pos].set_linewidth(1.2)
+					ax.spines[pos].set_color('k')
 
-		elif source == 'MRC0943':
-			fig, ax = pl.subplots(4, 3, figsize=(18, 10), sharex=False, sharey=False,
+			pl.savefig(self.plot_dir+'MRC0943_CI_spectrums.png', bbox_inches = 'tight',
+				pad_inches = 0.1, dpi=300)
+
+			fig, ax = pl.subplots(4, 2, figsize=(8, 6), sharex=False, sharey=False,
 			constrained_layout=True, gridspec_kw={'height_ratios': [1.5,0.5,1.5,0.5]})
 
-			fs=14
 			pl.subplots_adjust(wspace=0, hspace=0) 
 
-			# plot 2
-			ax[0][1].plot(voff11, data1[0][1], c='k', drawstyle='steps-mid', alpha=0.7, lw=1)
-			ax[0][1].plot(voff13, data3[0][1], c='#0a78d1', drawstyle='steps-mid', lw=1.5, alpha=0.9)
-			ax[0][1].text(x_pos, y_pos, 'B. Host Galaxy', ha='left', transform=ax[0][1].transAxes, fontsize=fs, color='k')
-			ax[0][1].set_yticklabels([])
-			
-			ax[1][1].set_xlabel(r'$\Delta v$ (km s$^{-1}$)', fontsize=fs)
-			ax[1][1].plot(voff12, data2[0][1], c='grey', alpha=0.5, drawstyle='steps-mid', lw=1.0)
-			ax[1][1].tick_params(axis='y', labelsize=fs)
-			ax[1][1].set_yticklabels([])
-			ax[1][1].tick_params(axis='x', labelsize=fs)
-
-			# plot 3
-			SW_cont = np.genfromtxt(self.output_dir+'SW_fit_params.txt')[6]
-			ax[0][2].plot(voff21, data1[1][1], c='red', alpha=0.7, lw=1)
-			ax[0][2].plot(voff22, data2[1][1], c='k', drawstyle='steps-mid', alpha=0.9, lw=1)
-			indices = [ i for i in range(len(voff22)) if (voff22[i] > -230. and voff22[i] < 170.)  ]
-			voff2_sub = [ voff22[i] for i in indices ]
-			data2_2_sub = [ data2[1][1][i] for i in indices ]
-			ax[0][2].fill_between( voff2_sub, SW_cont, data2_2_sub, where=data2_2_sub > SW_cont, interpolate=1, 
-				color='yellow', alpha=0.5)
-			ax[0][2].text(x_pos, y_pos, 'C. Thor (G16a) ', ha='left', transform=ax[0][2].transAxes, fontsize=fs, color='k')
-			ax[0][2].set_yticklabels([])
-
-			ax[1][2].set_xlabel(r'$\Delta v$ (km s$^{-1}$)', fontsize=fs)
-			ax[1][2].plot(voff23, data3[1][1], c='grey', alpha=0.5, drawstyle='steps-mid', lw=1)
-			ax[1][2].set_yticklabels([])
-			ax[1][2].tick_params(axis='x', labelsize=fs)
-
-			# plot 4
-			ax[2][0].plot(voff31, data1[2][1], c='k', drawstyle='steps-mid', alpha=0.7, lw=1.0)
-			ax[2][0].plot(voff33, data3[2][1], c='#0a78d1', drawstyle='steps-mid', lw=1.5, alpha=0.9)
-			ax[2][0].text(x_pos, y_pos, 'D. Loke (G16a)', ha='left', transform=ax[2][0].transAxes, fontsize=fs, color='k')
-			ax[2][0].tick_params(axis='y', labelsize=fs)
-			ax[2][0].set_ylabel(r'S$_\nu$ (mJy)', fontsize=fs)
-
-			ax[3][0].set_ylabel(r'$\sigma_{\nu}$', fontsize=fs )
-			ax[3][0].set_xlabel(r'$\Delta v$ (km s$^{-1}$)', fontsize=fs)
-			ax[3][0].plot(voff32, data2[2][1], c='grey', alpha=0.5, drawstyle='steps-mid', lw=1)
-			ax[3][0].tick_params(axis='y', labelsize=fs)
-			ax[3][0].tick_params(axis='x', labelsize=fs)
-
 			# plot 1
-			ax[0][0].plot(voff41, data1[3][1], c='k', drawstyle='steps-mid', alpha=0.7, lw=1)
-			ax[0][0].plot(voff43, data3[3][1], c='#0a78d1', drawstyle='steps-mid', lw=1.5, alpha=0.9)
+			ax[0][0].plot(voff41, data1[3][1], c='k', drawstyle='steps-mid', alpha=1, lw=0.8)
+			ax[0][0].plot(voff43, data3[3][1], c='#0a78d1', drawstyle='steps-mid', alpha=0.8, lw=0.8)
 			ax[0][0].text(x_pos, y_pos, 'A. North-East (E11)', ha='left', transform=ax[0][0].transAxes, fontsize=fs, color='k')
 			ax[0][0].set_ylabel(r'S$_\nu$ (mJy)', fontsize=fs)
 			ax[0][0].tick_params(axis='y', labelsize=fs)
 
 			ax[1][0].set_ylabel(r'$\sigma_{\nu}$', fontsize=fs )
 			ax[1][0].set_xlabel(r'$\Delta v$ (km s$^{-1}$)', fontsize=fs)
-			ax[1][0].plot(voff42, data2[3][1], c='grey', alpha=0.5, drawstyle='steps-mid', lw=1)
+			ax[1][0].plot(voff42, data2[3][1], c='grey', alpha=1.0, drawstyle='steps-mid', lw=0.8)
 			ax[1][0].tick_params(axis='y', labelsize=fs)
+			ax[1][0].tick_params(axis='x', labelsize=fs)
+
+			# plot 2
+			SW_cont = np.genfromtxt(self.output_dir+'SW_fit_params.txt')[6]
+			ax[0][1].plot(voff21, data1[1][1], c='red', alpha=1, lw=0.8)
+			# ax[0][1].plot([min(voff21),max(voff21)], [0, 0], c='red', ls='--', lw=0.8)
+			ax[0][1].plot(voff22, data2[1][1], c='k', drawstyle='steps-mid', alpha=1.0, lw=0.8)
+			indices = [ i for i in range(len(voff22)) if (voff22[i] > -240. and voff22[i] < 180.)  ]
+			voff2_sub = [ voff22[i] for i in indices ]
+			data2_2_sub = [ data2[1][1][i] for i in indices ]
+			ax[0][1].fill_between( voff2_sub, 0.0, data2_2_sub, where=data2_2_sub > SW_cont, interpolate=1, color='yellow', alpha=0.5)
+			ax[0][1].text(x_pos, y_pos, 'B. Thor (G16a) ', ha='left', transform=ax[0][1].transAxes, fontsize=fs, color='k')
+			ax[0][1].set_yticklabels([])
+
+			ax[1][1].set_xlabel(r'$\Delta v$ (km s$^{-1}$)', fontsize=fs)
+			ax[1][1].plot(voff23, data3[1][1], c='grey', alpha=1.0, drawstyle='steps-mid', lw=1)
+			ax[1][1].set_yticklabels([])
+			ax[1][1].tick_params(axis='x', labelsize=fs)
+
+			# plot 3
+			ax[2][1].plot(voff31, data1[2][1], c='k', drawstyle='steps-mid', alpha=1.0, lw=0.8)
+			ax[2][1].plot(voff33, data3[2][1], c='#0a78d1', drawstyle='steps-mid', alpha=0.8, lw=0.8)
+			ax[2][1].text(x_pos, y_pos, 'C. Loke (G16a)', ha='left', transform=ax[2][1].transAxes, fontsize=fs, color='k')
+			ax[2][1].set_yticklabels([])
+
+			ax[3][1].set_yticklabels([])
+			ax[3][1].set_xlabel(r'$\Delta v$ (km s$^{-1}$)', fontsize=fs)
+			ax[3][1].plot(voff32, data2[2][1], c='grey', alpha=1.0, drawstyle='steps-mid', lw=1)
+			ax[3][1].tick_params(axis='y', labelsize=fs)
+			ax[3][1].tick_params(axis='x', labelsize=fs)
 		
-			ax[2][1].axis("off")
-			ax[2][2].axis("off")
-			
-			ax[3][1].axis("off")
-			ax[3][2].axis("off")
+			ax[2][0].axis("off")
+			ax[3][0].axis("off")
 
 			# modify all axes
-			spec_ax = [ax[0]]
-			spec_ax = list(chain(*spec_ax)) + [ax[2][0]]
+			spec_ax = [ax[0]] 
+			spec_ax = list(chain(*spec_ax)) + [ax[2][1]]
 		
 			for sa in spec_ax :
 				miny,maxy,dy = -1.0, 2.0, 0.5
 				sa.set_yticks( np.arange(miny, maxy, dy) )
-				sa.plot([0.,0.], [miny, maxy], c='gray', ls='--', alpha=0.4, lw=1.0)
-				sa.tick_params(direction='in', length=4, right=1, top=1)
+				sa.plot([0.,0.], [miny, maxy], c='grey', ls='--', alpha=0.5, lw=0.8)
+				sa.tick_params(direction='in', length=4, right=1, top=1, width=1.)
 				sa.set_ylim([-0.99, 2.0])
 				sa.set_xlim([-399, 399])
 
-			var_ax = [ax[1]]
-			var_ax = list(chain(*var_ax)) + [ax[3][0]]
+				for pos in ['top','left','bottom', 'right']:
+					sa.spines[pos].set_linewidth(1.)
+					sa.spines[pos].set_color('k')
+
+			var_ax = [ax[1]] 
+			var_ax = list(chain(*var_ax)) + [ax[3][1]]
 
 			for va in var_ax: 
 				miny,maxy,dy = -0.5, 1.2, 0.5
 				va.set_yticks( np.arange(miny, maxy, dy) )
-				va.plot([0.,0.], [miny, maxy], c='gray', ls='--', alpha=0.4, lw=1.0)
-				va.tick_params(direction='in', length=4, right=1, top=1)
+				va.plot([0.,0.], [miny, maxy], c='grey', ls='--', alpha=0.5, lw=0.8)
+				va.tick_params(direction='in', length=4, right=1, top=1, width=1.)
 				va.set_ylim([miny+0.1, maxy])
 				va.set_xlim([-399, 399])
 
+				for pos in ['top','left','bottom', 'right']:
+					va.spines[pos].set_linewidth(1.)
+					va.spines[pos].set_color('k')
+
 			im = pl.imread(get_sample_data(self.plot_dir+'MRC0943_CI_moment0.png'))
-			newax = fig.add_axes([0.37, -0.04, 0.5, 0.5], zorder=-1)
+			newax = fig.add_axes([0.03, -0.06, 0.5, 0.5], zorder=-1)
 			newax.imshow(im)
 			newax.axis('off')
 
-			pl.savefig(self.plot_dir+'MRC0943_CI_spectrums.png', bbox_inches = 'tight',
+			pl.savefig(self.plot_dir+'MRC0943_CI_CGM_spectrums.png', bbox_inches = 'tight',
 				pad_inches = 0.1, dpi=300)
+
+		else:
+			fig, ax = pl.subplots(2, 1, figsize=(4, 3), sharex=True, 
+			constrained_layout=True, gridspec_kw={'height_ratios': [3,1]})
+
+			pl.subplots_adjust(hspace=0, wspace=0.01) 
+			ax[0].plot(voff1, data1[0][1], c='k', drawstyle='steps-mid', alpha=1.0, lw=0.8)
+			ax[0].plot(voff_wide, data3[0][1], c='#0a78d1', drawstyle='steps-mid', alpha=0.8, lw=0.8)
+			
+			if self.source == 'TNJ0205':
+				ax[0].text(x_pos, y_pos, 'TN J0205+2422 Host Galaxy', ha='left', transform=ax[0].transAxes, fontsize=fs, color='k')	
+			elif self.source == 'TNJ0121':
+				ax[0].text(x_pos, y_pos, 'TN J0121+1320 Host Galaxy', ha='left', transform=ax[0].transAxes, fontsize=fs, color='k')	
+			elif self.source == 'TNJ1338':
+				ax[0].text(x_pos, y_pos, 'TN J1338-1942 Host Galaxy', ha='left', transform=ax[0].transAxes, fontsize=fs, color='k')	
+			elif self.source == '4C04':
+				ax[0].text(x_pos, y_pos, '4C.04+11 Host Galaxy', ha='left', transform=ax[0].transAxes, fontsize=fs, color='k')	
+			elif self.source == '4C19':
+				ax[0].text(x_pos, y_pos, '4C+19.71 Host Galaxy', ha='left', transform=ax[0].transAxes, fontsize=fs, color='k')	
+
+			vel_data = data1[0][1]
+			if min(vel_data) > 0.:
+				miny,maxy,dy = roundup(min(vel_data)-0.5), max(vel_data)+0.5, 0.5
+			else: 
+				miny,maxy,dy = -1.0, max(vel_data)+0.5, 0.5
+
+			ax[0].plot([0.,0.], [miny, maxy], c='grey', ls='--', alpha=0.5)
+			ax[0].set_yticks( np.arange(miny, maxy, dy) )
+			ax[0].yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+			ax[0].set_ylim([miny+0.1, maxy])
+			ax[0].set_xlabel(r'$\Delta v$ (km s$^{-1}$)', fontsize=fs)
+			ax[0].set_ylabel(r'S$_\nu$ (mJy)', fontsize=fs)
+			ax[0].set_xlim([-400,400])
+
+			miny,maxy,dy = 0.0, 1.25, 0.5
+			ax[1].set_yticks( np.arange(miny, maxy, dy) )
+			ax[1].plot([0.,0.], [miny, maxy], c='grey', ls='--', alpha=0.5)
+			ax[1].set_ylabel(r'$\sigma_{\nu}$', fontsize=fs )
+			ax[1].set_xlabel(r'$\Delta v$ (km s$^{-1}$)', fontsize=fs)
+			ax[1].plot(voff2, data2[0][1], c='grey', alpha=0.5, drawstyle='steps-mid', lw=0.8)
+
+			for ax in ax: 
+				ax.tick_params(direction='in', length=4, right=1, top=1, width=1.)
+				for pos in ['top','left','bottom', 'right']:
+					ax.spines[pos].set_linewidth(1.2)
+					ax.spines[pos].set_color('k')
+		
+			pl.savefig(self.plot_dir+source+'_CI_spectrums.png', bbox_inches = 'tight', pad_inches = 0.1)
