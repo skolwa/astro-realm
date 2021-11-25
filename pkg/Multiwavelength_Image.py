@@ -377,7 +377,7 @@ class Multiwavelength_Image:
 		
 		ax1 = fig.add_axes([0.15, 0.12, 0.78, 0.8], projection=CI_wcs)
 
-		ax1.contour(CI_data, levels=contours, colors='blue', label='[CI](1-0)', zorder=5)
+		ax1.contour(CI_data, levels=contours, colors='blue', label='ALMA [CI]', zorder=5)
 
 		muse_Lya = mpdo.Cube(self.output_dir+Lya_subcube, ext=1)
 
@@ -386,6 +386,7 @@ class Multiwavelength_Image:
 		p1,p2 = spec.wave.pixel([lam1,lam2], nearest=True)
 
 		muse_img = muse_Lya[p1:p2+1, :, :].sum(axis=0)
+		# print(muse_img.info())
 		muse_img_arr = muse_img.data[:,:]
 		x = len(muse_img_arr)
 		y = len(muse_img_arr[0])
@@ -414,9 +415,10 @@ class Multiwavelength_Image:
 
 		lya_fn = self.muse_lya_contours( muse_lya_rms, self.output_dir+Lya_img+'_'+str(int(lam1))+'_'+str(int(lam2))+'.fits' )
 		lya_data, lya_wcs, contours = lya_fn[0], lya_fn[1], lya_fn[2]
+		# print(contours)
 
 		ax1.contour( lya_data, levels=contours, colors='grey', alpha=0.4,
-		transform=ax1.get_transform(muse_wcs) ) 
+		transform=ax1.get_transform(muse_wcs), label=r'MUSE Ly$\alpha$' ) 
 
 		for (h1,h2) in radio_hotspots:
 			ax1.scatter(h1, h2, marker='X', transform=ax1.get_transform(muse_wcs), facecolor='green', 
@@ -429,7 +431,7 @@ class Multiwavelength_Image:
 		[irac_data, irac_wcs, contours] = self.irac_contours( irac_path, irac_img, irac_rms, 6 )
 
 		ax1.contour( irac_data, levels=contours, colors='red', alpha=0.5,
-		transform=ax1.get_transform(irac_wcs) )
+		transform=ax1.get_transform(irac_wcs), label='IRAC 2' )
 
 		# l1,l2 are (x,y) of [CI]1-0 image
 		l1,l2 = img_dim
@@ -471,14 +473,11 @@ class Multiwavelength_Image:
 				backgroundcolor='white',
 				bbox={'facecolor':'white', 'alpha':0.8, 'pad':4}, zorder=5)
 
-
 		ax1.set_xlabel(r'$\alpha$ (J2000)', fontsize=12)
 		ax1.set_ylabel(r'$\delta$ (J2000)', fontsize=12)
 
-
 		ra = ax1.coords[0]
 		ra.set_major_formatter('hh:mm:ss.s')
-		print(self.plot_dir, irac_img)
 
 		return pl.savefig(self.plot_dir+irac_img[:-5]+'_CI.png', dpi=300)
 	

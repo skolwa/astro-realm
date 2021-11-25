@@ -17,7 +17,7 @@ class Gaussian:
 		----------
 		x : Wavelength axis
 	
-		a : Peak flux
+		a : Flux peak
 	
 		wid : Full-width at Half Maximum
 	
@@ -33,3 +33,31 @@ class Gaussian:
 		gauss = a*np.exp(-(x-g_cen)**2 /(2*wid**2))
 
 		return gauss + cont
+
+	def dgauss( x, a1, wid1, g_cen1, a2, wid2, g_cen2, cont ):
+		"""
+		Gaussian function with continuum
+		Peak flux is a fit parameter
+	
+		Parameters 
+		----------
+		x : Wavelength axis
+	
+		a1, a2 : Flux peaks
+	
+		wid1, wid2 : Full-width at Half Maxima
+	
+		g_cen1, g_cen2 : Gaussian centres
+	
+		cont : Continuum level
+	
+		Return
+		------
+		Ordinate : list
+		
+		"""
+
+		gauss1 = a1*np.exp(-(x-g_cen1)**2 /(2*wid1**2))
+		gauss2 = a2*np.exp(-(x-g_cen2)**2 /(2*wid2**2))
+
+		return gauss1 + gauss2 + cont

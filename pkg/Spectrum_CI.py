@@ -59,7 +59,9 @@ class Spectrum_CI:
 		Velocity (km/s)
 		
 		"""
-		v = self.c*(1. - freq_obs/freq_em/(1.+z) )
+		# v = self.c*(1. - freq_obs/freq_em/(1.+z) )
+		v = self.c*(freq_em/freq_obs/(1.+z) - 1. )
+
 		return v
 	
 	def convert_fwhm_kms( self, sigma, sigma_err, 
@@ -216,19 +218,13 @@ class Spectrum_CI:
 				M_H2 = Image_CI.get_mass(self, z, z_err, SdV, SdV_err, freq_o, freq_o_err, 1)	
 	
 				# Velocity shifts
-				v_sys = self.c*z / (1.+z)
-				v_obs = self.c*(1. - freq_o/freq_em)
+				v_sys = self.c*z
+				v_obs = self.c*(freq_em/freq_o - 1.)
 	
 				vel_offset = v_obs - v_sys
 				vel_offset_err = vel_offset * (freq_o_err/freq_o)
 				
 				print( "Velocity shift (km/s) = %.3f +/- %.3f" %( vel_offset, vel_offset_err ) )
-	
-				# Frequency range of moment-0 map
-				v_obs_mt0 = ( self.c*(1. - freq_obs_mt0[0]/freq_em) - v_sys, 
-					self.c*(1. - freq_obs_mt0[1]/freq_em) - v_sys )
-	
-				print('Moment-0 map velocity range: %.2f to %.2f km/s' %(v_obs_mt0[1], v_obs_mt0[0]) )
 	
 				freq_ax = np.linspace( freq.min(), freq.max(), num=len(freq))
 
@@ -243,8 +239,16 @@ class Spectrum_CI:
 
 			# No [CI] line detection
 			else:
+				v_sys = self.c*z
 				print("[CI] line not detected")
-			
+
+
+			# Frequency range of moment-0 map
+			v_obs_mt0 = ( self.c*(freq_em/freq_obs_mt0[0] - 1.) - v_sys, 
+				self.c*(freq_em/freq_obs_mt0[1] - 1.) - v_sys )
+
+			print('Moment-0 map velocity range: %.2f to %.2f km/s' %(v_obs_mt0[1], v_obs_mt0[0]) )
+	
 			ax.plot( freq, flux, c='k', drawstyle='steps-mid' )
 			ax.plot( freq, rms, c='grey', alpha=1.0, drawstyle='steps-mid')
 
@@ -307,61 +311,61 @@ class Spectrum_CI:
 
 		# Velocity axes 
 		if source=='4C03' :
-			v_radio1 = [ self.freq_to_vel(data1[0][0][i], freq_em, 0.) for i in range(len(data1[0][0])) ] #model
-			v_radio2 = [ self.freq_to_vel(data2[0][0][i], freq_em, 0.) for i in range(len(data2[0][0])) ] #data 
+			v_opt1 = [ self.freq_to_vel(data1[0][0][i], freq_em, 0.) for i in range(len(data1[0][0])) ] #model
+			v_opt2 = [ self.freq_to_vel(data2[0][0][i], freq_em, 0.) for i in range(len(data2[0][0])) ] #data 
 
 
-			voff1 = [ v_radio1[i] - vel0 for i in range(len(v_radio1)) ]
-			voff2 = [ v_radio2[i] - vel0 for i in range(len(v_radio2)) ]
+			voff1 = [ v_opt1[i] - vel0 for i in range(len(v_opt1)) ]
+			voff2 = [ v_opt2[i] - vel0 for i in range(len(v_opt2)) ]
 
 		elif source=='MRC0943':
 			# plot 1
-			v_radio11 = [ self.freq_to_vel(data1[0][0][i], freq_em, 0.) for i in range(len(data1[0][0])) ] #flux data
-			v_radio12 = [ self.freq_to_vel(data2[0][0][i], freq_em, 0.) for i in range(len(data2[0][0])) ] #rms data
-			v_radio13 = [ self.freq_to_vel(data3[0][0][i], freq_em, 0.) for i in range(len(data3[0][0])) ] #wide binning
+			v_opt11 = [ self.freq_to_vel(data1[0][0][i], freq_em, 0.) for i in range(len(data1[0][0])) ] #flux data
+			v_opt12 = [ self.freq_to_vel(data2[0][0][i], freq_em, 0.) for i in range(len(data2[0][0])) ] #rms data
+			v_opt13 = [ self.freq_to_vel(data3[0][0][i], freq_em, 0.) for i in range(len(data3[0][0])) ] #wide binning
 
 
-			voff11 = [ v_radio11[i] - vel0 for i in range(len(v_radio11)) ]
-			voff12 = [ v_radio12[i] - vel0 for i in range(len(v_radio12)) ]	
-			voff13 = [ v_radio13[i] - vel0 for i in range(len(v_radio13)) ]
+			voff11 = [ v_opt11[i] - vel0 for i in range(len(v_opt11)) ]
+			voff12 = [ v_opt12[i] - vel0 for i in range(len(v_opt12)) ]	
+			voff13 = [ v_opt13[i] - vel0 for i in range(len(v_opt13)) ]
 
 			# plot 2	
-			v_radio21 = [ self.freq_to_vel(data1[1][0][i], freq_em, 0.) for i in range(len(data1[1][0])) ] #model 
-			v_radio22 = [ self.freq_to_vel(data2[1][0][i], freq_em, 0.) for i in range(len(data2[1][0])) ] #flux data 
-			v_radio23 = [ self.freq_to_vel(data3[1][0][i], freq_em, 0.) for i in range(len(data3[1][0])) ] #rms data 
+			v_opt21 = [ self.freq_to_vel(data1[1][0][i], freq_em, 0.) for i in range(len(data1[1][0])) ] #model 
+			v_opt22 = [ self.freq_to_vel(data2[1][0][i], freq_em, 0.) for i in range(len(data2[1][0])) ] #flux data 
+			v_opt23 = [ self.freq_to_vel(data3[1][0][i], freq_em, 0.) for i in range(len(data3[1][0])) ] #rms data 
 
 
-			voff21 = [ v_radio21[i] - vel0 for i in range(len(v_radio21)) ]
-			voff22 = [ v_radio22[i] - vel0 for i in range(len(v_radio22)) ]	
-			voff23 = [ v_radio23[i] - vel0 for i in range(len(v_radio23)) ]
+			voff21 = [ v_opt21[i] - vel0 for i in range(len(v_opt21)) ]
+			voff22 = [ v_opt22[i] - vel0 for i in range(len(v_opt22)) ]	
+			voff23 = [ v_opt23[i] - vel0 for i in range(len(v_opt23)) ]
 
 			#plot 3	
-			v_radio31 = [ self.freq_to_vel(data1[2][0][i], freq_em, 0.) for i in range(len(data1[2][0])) ] #flux data
-			v_radio32 = [ self.freq_to_vel(data2[2][0][i], freq_em, 0.) for i in range(len(data2[2][0])) ] #rms data
-			v_radio33 = [ self.freq_to_vel(data3[2][0][i], freq_em, 0.) for i in range(len(data3[2][0])) ] #wide binning
+			v_opt31 = [ self.freq_to_vel(data1[2][0][i], freq_em, 0.) for i in range(len(data1[2][0])) ] #flux data
+			v_opt32 = [ self.freq_to_vel(data2[2][0][i], freq_em, 0.) for i in range(len(data2[2][0])) ] #rms data
+			v_opt33 = [ self.freq_to_vel(data3[2][0][i], freq_em, 0.) for i in range(len(data3[2][0])) ] #wide binning
 
-			voff31 = [ v_radio31[i] - vel0 for i in range(len(v_radio31)) ]
-			voff32 = [ v_radio32[i] - vel0 for i in range(len(v_radio32)) ]	
-			voff33 = [ v_radio33[i] - vel0 for i in range(len(v_radio33)) ]
+			voff31 = [ v_opt31[i] - vel0 for i in range(len(v_opt31)) ]
+			voff32 = [ v_opt32[i] - vel0 for i in range(len(v_opt32)) ]	
+			voff33 = [ v_opt33[i] - vel0 for i in range(len(v_opt33)) ]
 
 			#plot 4
-			v_radio41 = [ self.freq_to_vel(data1[3][0][i], freq_em, 0.) for i in range(len(data1[3][0])) ] #flux data
-			v_radio42 = [ self.freq_to_vel(data2[3][0][i], freq_em, 0.) for i in range(len(data2[3][0])) ] #rms data
-			v_radio43 = [ self.freq_to_vel(data3[3][0][i], freq_em, 0.) for i in range(len(data3[3][0])) ] #wide binning
+			v_opt41 = [ self.freq_to_vel(data1[3][0][i], freq_em, 0.) for i in range(len(data1[3][0])) ] #flux data
+			v_opt42 = [ self.freq_to_vel(data2[3][0][i], freq_em, 0.) for i in range(len(data2[3][0])) ] #rms data
+			v_opt43 = [ self.freq_to_vel(data3[3][0][i], freq_em, 0.) for i in range(len(data3[3][0])) ] #wide binning
 
-			voff41 = [ v_radio41[i] - vel0 for i in range(len(v_radio41)) ]
-			voff42 = [ v_radio42[i] - vel0 for i in range(len(v_radio42)) ]	
-			voff43 = [ v_radio43[i] - vel0 for i in range(len(v_radio43)) ]
+			voff41 = [ v_opt41[i] - vel0 for i in range(len(v_opt41)) ]
+			voff42 = [ v_opt42[i] - vel0 for i in range(len(v_opt42)) ]	
+			voff43 = [ v_opt43[i] - vel0 for i in range(len(v_opt43)) ]
 
 		else:
-			v_radio1 = [ self.freq_to_vel(data1[0][0][i], freq_em, 0.) for i in range(len(data1[0][0])) ] #model
-			v_radio2 = [ self.freq_to_vel(data2[0][0][i], freq_em, 0.) for i in range(len(data2[0][0])) ] #data 
-			v_radio3 = [ self.freq_to_vel(data3[0][0][i], freq_em, 0.) for i in range(len(data3[0][0])) ] #data 
+			v_opt1 = [ self.freq_to_vel(data1[0][0][i], freq_em, 0.) for i in range(len(data1[0][0])) ] #model
+			v_opt2 = [ self.freq_to_vel(data2[0][0][i], freq_em, 0.) for i in range(len(data2[0][0])) ] #data 
+			v_opt3 = [ self.freq_to_vel(data3[0][0][i], freq_em, 0.) for i in range(len(data3[0][0])) ] #data 
 
 
-			voff1 = [ v_radio1[i] - vel0 for i in range(len(v_radio1)) ]
-			voff2 = [ v_radio2[i] - vel0 for i in range(len(v_radio2)) ]	
-			voff_wide = [ v_radio3[i] - vel0 for i in range(len(v_radio3)) ]	
+			voff1 = [ v_opt1[i] - vel0 for i in range(len(v_opt1)) ]
+			voff2 = [ v_opt2[i] - vel0 for i in range(len(v_opt2)) ]	
+			voff_wide = [ v_opt3[i] - vel0 for i in range(len(v_opt3)) ]	
 
 		# round up to nearest 0.5
 		def roundup(x):
@@ -385,7 +389,7 @@ class Spectrum_CI:
 			# ax[0].plot(voff2, data4[0][1], c='#d2e5f7', drawstyle='steps-mid', alpha=0.8, lw=0.8) 
 			ax[0].plot(voff2, data2[0][1], c='k', drawstyle='steps-mid', alpha=0.9, lw=0.8)
 			ax[0].plot(voff1, data1[0][1], c='red', alpha=0.7, lw=0.8)
-			indices = [ i for i in range(len(voff2)) if (voff2[i] > 220. and voff2[i] < 320.)  ]
+			indices = [ i for i in range(len(voff2)) if (voff2[i] > 4595. and voff2[i] < 6500.)  ]
 			voff2_sub = [ voff2[i] for i in indices ]
 			data1_2_sub = [ data2[0][1][i] for i in indices ]
 			ax[0].fill_between( voff2_sub, data1_2_sub, host_cont, where=data1_2_sub > host_cont , 
@@ -398,7 +402,7 @@ class Spectrum_CI:
 			ax[0].set_yticks( np.arange(miny, maxy, dy) )
 			ax[0].yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
 			ax[0].set_ylim([miny+0.1, maxy])
-			ax[0].set_xlim([-400,400])
+			ax[0].set_xlim([-8000,8000])
 			
 			miny,maxy,dy = 0.0, 0.7, 0.3
 			ax[1].set_yticks( np.arange(miny, maxy, dy) )
@@ -433,7 +437,7 @@ class Spectrum_CI:
 			ax[0].set_ylim([miny+0.1, maxy])
 			ax[0].set_xlabel(r'$\Delta v$ (km s$^{-1}$)', fontsize=fs)
 			ax[0].set_ylabel(r'S$_\nu$ (mJy)', fontsize=fs)
-			ax[0].set_xlim([-400,400])
+			ax[0].set_xlim([-8000,8000])
 
 			miny,maxy,dy = 0.0, 1.25, 0.5
 			ax[1].set_yticks( np.arange(miny, maxy, dy) )
@@ -474,7 +478,7 @@ class Spectrum_CI:
 			ax[0][1].plot(voff21, data1[1][1], c='red', alpha=1, lw=0.8)
 			# ax[0][1].plot([min(voff21),max(voff21)], [0, 0], c='red', ls='--', lw=0.8)
 			ax[0][1].plot(voff22, data2[1][1], c='k', drawstyle='steps-mid', alpha=1.0, lw=0.8)
-			indices = [ i for i in range(len(voff22)) if (voff22[i] > -240. and voff22[i] < 180.)  ]
+			indices = [ i for i in range(len(voff22)) if (voff22[i] > -3200. and voff22[i] < 2510.)  ]
 			voff2_sub = [ voff22[i] for i in indices ]
 			data2_2_sub = [ data2[1][1][i] for i in indices ]
 			ax[0][1].fill_between( voff2_sub, 0.0, data2_2_sub, where=data2_2_sub > SW_cont, interpolate=1, color='yellow', alpha=0.5)
@@ -511,7 +515,7 @@ class Spectrum_CI:
 				sa.plot([0.,0.], [miny, maxy], c='grey', ls='--', alpha=0.5, lw=0.8)
 				sa.tick_params(direction='in', length=4, right=1, top=1, width=1.)
 				sa.set_ylim([-0.99, 2.0])
-				sa.set_xlim([-399, 399])
+				sa.set_xlim([-8000,8000])
 
 				for pos in ['top','left','bottom', 'right']:
 					sa.spines[pos].set_linewidth(1.)
@@ -526,7 +530,7 @@ class Spectrum_CI:
 				va.plot([0.,0.], [miny, maxy], c='grey', ls='--', alpha=0.5, lw=0.8)
 				va.tick_params(direction='in', length=4, right=1, top=1, width=1.)
 				va.set_ylim([miny+0.1, maxy])
-				va.set_xlim([-399, 399])
+				va.set_xlim([-8000,8000])
 
 				for pos in ['top','left','bottom', 'right']:
 					va.spines[pos].set_linewidth(1.)
@@ -571,7 +575,7 @@ class Spectrum_CI:
 			ax[0].set_ylim([miny+0.1, maxy])
 			ax[0].set_xlabel(r'$\Delta v$ (km s$^{-1}$)', fontsize=fs)
 			ax[0].set_ylabel(r'S$_\nu$ (mJy)', fontsize=fs)
-			ax[0].set_xlim([-400,400])
+			ax[0].set_xlim([-8000,8000])
 
 			miny,maxy,dy = 0.0, 1.25, 0.5
 			ax[1].set_yticks( np.arange(miny, maxy, dy) )
